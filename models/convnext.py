@@ -65,7 +65,7 @@ class ConvNeXt(nn.Module):
     """
     def __init__(self, in_chans=3, num_classes=1000, 
                  depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], drop_path_rate=0., 
-                 layer_scale_init_value=1e-6, head_init_scale=1.,
+                 layer_scale_init_value=1e-6, head_init_scale=1.,features_only=None,
                  ):
         super().__init__()
 
@@ -100,20 +100,26 @@ class ConvNeXt(nn.Module):
         self.head.weight.data.mul_(head_init_scale)
         self.head.bias.data.mul_(head_init_scale)
 
+        chs = [in_chans] + dims
+        self.feature_info = [{"num_chs":c} for c in chs]
+
     def _init_weights(self, m):
         if isinstance(m, (nn.Conv2d, nn.Linear)):
             trunc_normal_(m.weight, std=.02)
             nn.init.constant_(m.bias, 0)
 
     def forward_features(self, x):
+        xs = [x]
         for i in range(4):
             x = self.downsample_layers[i](x)
             x = self.stages[i](x)
-        return self.norm(x.mean([-2, -1])) # global average pooling, (N, C, H, W) -> (N, C)
+            xs.append(x)
+        # return self.norm(x.mean([-2, -1])) # global average pooling, (N, C, H, W) -> (N, C)
+        return tuple(xs) # global average pooling, (N, C, H, W) -> (N, C)
 
     def forward(self, x):
         x = self.forward_features(x)
-        x = self.head(x)
+        # x = self.head(x)
         return x
 
 class LayerNorm(nn.Module):
